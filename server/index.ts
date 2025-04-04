@@ -198,9 +198,11 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
     
     // Filter for meetings (using same logic as in /api/meetings)
     const meetings = events.filter(event => {
-      // FIRST: Check for explicit non-meeting indicators that would immediately disqualify an event
+      // Extract the summary text (title) and description and convert to lowercase for matching
+      const eventTitle = (event.summary || '').toLowerCase();
+      const eventDescription = (event.description || '').toLowerCase();
       
-      // Expanded non-meeting keywords check
+      // FIRST: Check for explicit non-meeting indicators (hard NOs)
       const nonMeetingKeywords = [
         // Social events
         'party', 'social', 'celebration', 'happy hour', 'drinks', 'dinner', 'lunch', 
@@ -233,46 +235,22 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
       // Create a regex pattern from the non-meeting keywords
       const nonMeetingPattern = new RegExp(`\\b(${nonMeetingKeywords.join('|')})\\b`, 'i');
       
-      // Extract the summary text (title) and convert to lowercase for more accurate matching
-      const eventTitle = (event.summary || '').toLowerCase();
-      const eventDescription = (event.description || '').toLowerCase();
-      
-      // Immediate disqualifiers for non-meetings
-      const hasNonMeetingKeyword = nonMeetingPattern.test(eventTitle) || nonMeetingPattern.test(eventDescription);
-      
-      // Reject non-meetings immediately
-      if (hasNonMeetingKeyword) {
+      // Check for hard NO keywords in title or description
+      if (nonMeetingPattern.test(eventTitle) || nonMeetingPattern.test(eventDescription)) {
         return false;
       }
       
-      // SECOND: Check for positive meeting indicators
-
-      // 1. Has video conferencing data (strongest indicator)
-      const hasConferenceData = !!event.conferenceData;
-      
-      // 2. Check for conferencing links in the description
-      const conferencePatterns = [
-        'zoom.us', 'meet.google', 'teams.microsoft', 'webex.com', 'gotomeeting.com', 
-        'bluejeans.com', 'whereby.com', 'meet.jit.si', 'hangouts.google', 'chime.aws'
-      ];
-      const conferenceRegex = new RegExp(conferencePatterns.join('|'), 'i');
-      const hasConferenceLink = !!event.description && conferenceRegex.test(event.description);
-      
-      // 3. Check for multiple attendees (strong indicator, but exclude mass events)
-      const attendeeCount = event.attendees?.length || 0;
-      const hasMultipleAttendees = attendeeCount > 1 && attendeeCount < 100;  // Mass events usually have 100+ attendees
-      
-      // 4. Enhanced keyword detection for meetings
+      // SECOND: Check for explicit meeting indicators (hard YES)
       const meetingKeywords = [
         // Common meeting terms
-        'meeting', 'sync', 'catchup', 'catch-up', 'catch up', '1:1', '1on1', 'one on one',
+        'meeting', 'sync', 'catchup', 'catch-up', 'catch up', '1:1', '1on1', 'one on one', 'one-on-one',
         
         // Meeting types
         'standup', 'stand-up', 'planning', 'review', 'retrospective', 'retro', 'demo', 'showcase',
-        'check-in', 'check in', 'check-up', 'follow-up', 'follow up',
+        'check-in', 'check in', 'follow-up', 'follow up',
         
         // Business discussions
-        'discussion', 'call', 'chat', 'talk', 'interview', 'screening', 'debrief', 'alignment',
+        'discussion', 'call', 'interview', 'debrief', 'alignment',
         
         // Meeting formats
         'workshop', 'session', 'working session', 'brainstorm', 'briefing', 'presentation',
@@ -285,83 +263,42 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
       // Create a regex pattern from the meeting keywords
       const meetingPattern = new RegExp(`\\b(${meetingKeywords.join('|')})\\b`, 'i');
       
-      // Test if the event has meeting keywords in title
-      const hasMeetingKeywords = meetingPattern.test(eventTitle);
-      
-      // 5. Check if it's during work hours (weekday, business hours)
-      const isWorkHours = () => {
-        if (!event.start?.dateTime) return false;
-        const date = new Date(event.start.dateTime);
-        const isWeekday = date.getDay() >= 1 && date.getDay() <= 5;  // Monday to Friday
-        const hour = date.getHours();
-        return isWeekday && hour >= 9 && hour < 18;  // 9am to 6pm
-      };
-      
-      // 6. Check if the event has responses from attendees (indicating engagement)
-      const hasAttendeeResponses = event.attendees?.some(attendee => 
-        attendee.responseStatus === 'accepted' || attendee.responseStatus === 'tentative'
-      );
-      
-      // 7. Check if this is a recurring meeting (strong indicator of a formal meeting)
-      const isRecurring = !!event.recurringEventId;
-      
-      // 8. Check if this event is in a meeting room (location-based check)
-      const isMeetingRoom = () => {
-        const location = (event.location || '').toLowerCase();
-        return location.includes('room') || 
-               location.includes('conference') || 
-               location.includes('meeting') ||
-               location.includes('office');
-      };
-      
-      // 9. Check for calendar ownership (events on your primary calendar are more likely to be your meetings)
-      const isPrimaryCalendar = event.organizer?.self === true;
-      
-      // THIRD: Calculate meeting score using weighted indicators
-      
-      // Meeting score calculation (higher = more likely to be a meeting)
-      let meetingScore = 0;
-      
-      // Strongest indicators
-      if (hasConferenceData || hasConferenceLink) meetingScore += 10;
-      if (hasMeetingKeywords) meetingScore += 8;
-      
-      // Strong indicators
-      if (hasMultipleAttendees) meetingScore += 6;
-      if (isRecurring) meetingScore += 5;
-      if (hasAttendeeResponses) meetingScore += 4;
-      
-      // Moderate indicators
-      if (isMeetingRoom()) meetingScore += 3;
-      if (isPrimaryCalendar) meetingScore += 2;
-      if (isWorkHours()) meetingScore += 2;
-      
-      // FOURTH: Additional checks for ambiguous cases
-      
-      // Check for telltale signs of all-day events (often not meetings)
-      const isAllDay = !event.start?.dateTime && !!event.start?.date;
-      if (isAllDay) {
-        meetingScore -= 5; // Reduce score for all-day events
+      // Check for hard YES keywords in title
+      if (meetingPattern.test(eventTitle)) {
+        return true;
       }
       
-      // Long events are less likely to be meetings (4+ hours)
-      if (event.start?.dateTime && event.end?.dateTime) {
-        const start = new Date(event.start.dateTime);
-        const end = new Date(event.end.dateTime);
-        const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-        
-        if (durationHours >= 4) {
-          meetingScore -= 3; // Reduce score for very long events
-        }
+      // THIRD: Check for strong meeting indicators if no explicit keywords were found
+      
+      // Video conferencing is a strong indicator of a meeting
+      if (event.conferenceData) {
+        return true;
       }
       
-      // A high number of attendees might indicate a large event rather than a meeting
-      if (attendeeCount > 30) {
-        meetingScore -= 3; // Reduce score for very large events
+      // Check for conferencing links in the description
+      const conferencePatterns = [
+        'zoom.us', 'meet.google', 'teams.microsoft', 'webex.com', 'gotomeeting.com', 
+        'bluejeans.com', 'whereby.com', 'meet.jit.si', 'hangouts.google', 'chime.aws'
+      ];
+      const conferenceRegex = new RegExp(conferencePatterns.join('|'), 'i');
+      if (event.description && conferenceRegex.test(event.description)) {
+        return true;
       }
       
-      // Combine all factors - threshold of 5 for considering it a meeting
-      return meetingScore >= 5;
+      // Check for location that indicates a meeting room
+      const location = (event.location || '').toLowerCase();
+      if (location.includes('room') || location.includes('conference') || location.includes('meeting')) {
+        return true;
+      }
+      
+      // Check for multiple attendees (strong indicator for a meeting)
+      const attendeeCount = event.attendees?.length || 0;
+      if (attendeeCount > 1 && attendeeCount < 30) {  // More than 1 person but less than mass event
+        return true;
+      }
+      
+      // By default, don't count it as a meeting if none of the above conditions match
+      return false;
     });
     
     // Debug logging for meetings
@@ -508,9 +445,11 @@ app.get('/api/meeting-stats-image', verifyToken, async (req, res) => {
     
     // Filter for meetings (using same logic as in /api/meetings)
     const meetings = events.filter(event => {
-      // FIRST: Check for explicit non-meeting indicators that would immediately disqualify an event
+      // Extract the summary text (title) and description and convert to lowercase for matching
+      const eventTitle = (event.summary || '').toLowerCase();
+      const eventDescription = (event.description || '').toLowerCase();
       
-      // Expanded non-meeting keywords check
+      // FIRST: Check for explicit non-meeting indicators (hard NOs)
       const nonMeetingKeywords = [
         // Social events
         'party', 'social', 'celebration', 'happy hour', 'drinks', 'dinner', 'lunch', 
@@ -543,46 +482,22 @@ app.get('/api/meeting-stats-image', verifyToken, async (req, res) => {
       // Create a regex pattern from the non-meeting keywords
       const nonMeetingPattern = new RegExp(`\\b(${nonMeetingKeywords.join('|')})\\b`, 'i');
       
-      // Extract the summary text (title) and convert to lowercase for more accurate matching
-      const eventTitle = (event.summary || '').toLowerCase();
-      const eventDescription = (event.description || '').toLowerCase();
-      
-      // Immediate disqualifiers for non-meetings
-      const hasNonMeetingKeyword = nonMeetingPattern.test(eventTitle) || nonMeetingPattern.test(eventDescription);
-      
-      // Reject non-meetings immediately
-      if (hasNonMeetingKeyword) {
+      // Check for hard NO keywords in title or description
+      if (nonMeetingPattern.test(eventTitle) || nonMeetingPattern.test(eventDescription)) {
         return false;
       }
       
-      // SECOND: Check for positive meeting indicators
-
-      // 1. Has video conferencing data (strongest indicator)
-      const hasConferenceData = !!event.conferenceData;
-      
-      // 2. Check for conferencing links in the description
-      const conferencePatterns = [
-        'zoom.us', 'meet.google', 'teams.microsoft', 'webex.com', 'gotomeeting.com', 
-        'bluejeans.com', 'whereby.com', 'meet.jit.si', 'hangouts.google', 'chime.aws'
-      ];
-      const conferenceRegex = new RegExp(conferencePatterns.join('|'), 'i');
-      const hasConferenceLink = !!event.description && conferenceRegex.test(event.description);
-      
-      // 3. Check for multiple attendees (strong indicator, but exclude mass events)
-      const attendeeCount = event.attendees?.length || 0;
-      const hasMultipleAttendees = attendeeCount > 1 && attendeeCount < 100;  // Mass events usually have 100+ attendees
-      
-      // 4. Enhanced keyword detection for meetings
+      // SECOND: Check for explicit meeting indicators (hard YES)
       const meetingKeywords = [
         // Common meeting terms
-        'meeting', 'sync', 'catchup', 'catch-up', 'catch up', '1:1', '1on1', 'one on one',
+        'meeting', 'sync', 'catchup', 'catch-up', 'catch up', '1:1', '1on1', 'one on one', 'one-on-one',
         
         // Meeting types
         'standup', 'stand-up', 'planning', 'review', 'retrospective', 'retro', 'demo', 'showcase',
-        'check-in', 'check in', 'check-up', 'follow-up', 'follow up',
+        'check-in', 'check in', 'follow-up', 'follow up',
         
         // Business discussions
-        'discussion', 'call', 'chat', 'talk', 'interview', 'screening', 'debrief', 'alignment',
+        'discussion', 'call', 'interview', 'debrief', 'alignment',
         
         // Meeting formats
         'workshop', 'session', 'working session', 'brainstorm', 'briefing', 'presentation',
@@ -595,83 +510,42 @@ app.get('/api/meeting-stats-image', verifyToken, async (req, res) => {
       // Create a regex pattern from the meeting keywords
       const meetingPattern = new RegExp(`\\b(${meetingKeywords.join('|')})\\b`, 'i');
       
-      // Test if the event has meeting keywords in title
-      const hasMeetingKeywords = meetingPattern.test(eventTitle);
-      
-      // 5. Check if it's during work hours (weekday, business hours)
-      const isWorkHours = () => {
-        if (!event.start?.dateTime) return false;
-        const date = new Date(event.start.dateTime);
-        const isWeekday = date.getDay() >= 1 && date.getDay() <= 5;
-        const hour = date.getHours();
-        return isWeekday && hour >= 9 && hour < 18;
-      };
-      
-      // 6. Check if the event has responses from attendees (indicating engagement)
-      const hasAttendeeResponses = event.attendees?.some(attendee => 
-        attendee.responseStatus === 'accepted' || attendee.responseStatus === 'tentative'
-      );
-      
-      // 7. Check if this is a recurring meeting (strong indicator of a formal meeting)
-      const isRecurring = !!event.recurringEventId;
-      
-      // 8. Check if this event is in a meeting room (location-based check)
-      const isMeetingRoom = () => {
-        const location = (event.location || '').toLowerCase();
-        return location.includes('room') || 
-               location.includes('conference') || 
-               location.includes('meeting') ||
-               location.includes('office');
-      };
-      
-      // 9. Check for calendar ownership (events on your primary calendar are more likely to be your meetings)
-      const isPrimaryCalendar = event.organizer?.self === true;
-      
-      // THIRD: Calculate meeting score using weighted indicators
-      
-      // Meeting score calculation (higher = more likely to be a meeting)
-      let meetingScore = 0;
-      
-      // Strongest indicators
-      if (hasConferenceData || hasConferenceLink) meetingScore += 10;
-      if (hasMeetingKeywords) meetingScore += 8;
-      
-      // Strong indicators
-      if (hasMultipleAttendees) meetingScore += 6;
-      if (isRecurring) meetingScore += 5;
-      if (hasAttendeeResponses) meetingScore += 4;
-      
-      // Moderate indicators
-      if (isMeetingRoom()) meetingScore += 3;
-      if (isPrimaryCalendar) meetingScore += 2;
-      if (isWorkHours()) meetingScore += 2;
-      
-      // FOURTH: Additional checks for ambiguous cases
-      
-      // Check for telltale signs of all-day events (often not meetings)
-      const isAllDay = !event.start?.dateTime && !!event.start?.date;
-      if (isAllDay) {
-        meetingScore -= 5; // Reduce score for all-day events
+      // Check for hard YES keywords in title
+      if (meetingPattern.test(eventTitle)) {
+        return true;
       }
       
-      // Long events are less likely to be meetings (4+ hours)
-      if (event.start?.dateTime && event.end?.dateTime) {
-        const start = new Date(event.start.dateTime);
-        const end = new Date(event.end.dateTime);
-        const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-        
-        if (durationHours >= 4) {
-          meetingScore -= 3; // Reduce score for very long events
-        }
+      // THIRD: Check for strong meeting indicators if no explicit keywords were found
+      
+      // Video conferencing is a strong indicator of a meeting
+      if (event.conferenceData) {
+        return true;
       }
       
-      // A high number of attendees might indicate a large event rather than a meeting
-      if (attendeeCount > 30) {
-        meetingScore -= 3; // Reduce score for very large events
+      // Check for conferencing links in the description
+      const conferencePatterns = [
+        'zoom.us', 'meet.google', 'teams.microsoft', 'webex.com', 'gotomeeting.com', 
+        'bluejeans.com', 'whereby.com', 'meet.jit.si', 'hangouts.google', 'chime.aws'
+      ];
+      const conferenceRegex = new RegExp(conferencePatterns.join('|'), 'i');
+      if (event.description && conferenceRegex.test(event.description)) {
+        return true;
       }
       
-      // Combine all factors - threshold of 5 for considering it a meeting
-      return meetingScore >= 5;
+      // Check for location that indicates a meeting room
+      const location = (event.location || '').toLowerCase();
+      if (location.includes('room') || location.includes('conference') || location.includes('meeting')) {
+        return true;
+      }
+      
+      // Check for multiple attendees (strong indicator for a meeting)
+      const attendeeCount = event.attendees?.length || 0;
+      if (attendeeCount > 1 && attendeeCount < 30) {  // More than 1 person but less than mass event
+        return true;
+      }
+      
+      // By default, don't count it as a meeting if none of the above conditions match
+      return false;
     });
 
     let totalMinutes = 0;
