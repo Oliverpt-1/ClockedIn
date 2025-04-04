@@ -6,6 +6,7 @@ import session from 'express-session';
 import jwt from 'jsonwebtoken';
 import 'isomorphic-fetch';
 import { JWTPayload } from './types';
+import rateLimit from 'express-rate-limit';
 
 dotenv.config();
 
@@ -13,6 +14,17 @@ const app = express();
 const port = process.env.PORT || 3001;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+// Simple rate limiter to prevent abuse
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  standardHeaders: true,
+  message: 'Too many requests, please try again later'
+});
+
+// Apply rate limiting to API routes
+app.use('/api/', apiLimiter);
 
 // Middleware setup
 app.use(cors({
@@ -33,11 +45,40 @@ app.use(session({
   }
 }));
 
-// Store tokens temporarily (in production, use a proper database)
+// Store tokens temporarily with expiry information
 interface UserTokens {
   [key: string]: any;
 }
+
+interface CacheEntry {
+  timestamp: number;
+  data: any;
+}
+
+interface UserCache {
+  [userId: string]: {
+    meetings?: CacheEntry;
+  };
+}
+
 let userTokens: UserTokens = {};
+let userCache: UserCache = {};
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
+
+// Clean up expired tokens every hour
+const TOKEN_CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
+setInterval(() => {
+  const now = Date.now();
+  for (const userId in userTokens) {
+    if (userTokens[userId].expiry_date && userTokens[userId].expiry_date < now) {
+      console.log(`Cleaning up expired token for user: ${userId}`);
+      delete userTokens[userId];
+      // Also clear their cache
+      delete userCache[userId];
+    }
+  }
+  console.log(`Token cleanup complete. Active users: ${Object.keys(userTokens).length}`);
+}, TOKEN_CLEANUP_INTERVAL);
 
 // Google OAuth2 setup
 const oauth2Client = new google.auth.OAuth2(
@@ -90,7 +131,12 @@ app.get('/auth/google/callback', async (req, res) => {
   try {
     const { tokens } = await oauth2Client.getToken(code as string);
     const userId = Math.random().toString(36).substring(7); // In production, use proper user IDs
-    userTokens[userId] = tokens;
+    
+    // Store tokens with expiry information for cleanup
+    userTokens[userId] = {
+      ...tokens,
+      created_at: Date.now()
+    };
     
     // Create JWT token
     const token = jwt.sign({ userId, authenticated: true }, JWT_SECRET, { expiresIn: '24h' });
@@ -113,13 +159,19 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
   try {
     const userId = (req.user as any).userId;
     console.log('User ID from token:', userId);
-    console.log('Available token user IDs:', Object.keys(userTokens));
     
     const tokens = userTokens[userId];
     
     if (!tokens) {
       console.log('No tokens found for user ID:', userId);
       return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Check if we have cached data for this user
+    const cachedData = userCache[userId]?.meetings;
+    if (cachedData && (Date.now() - cachedData.timestamp) < CACHE_TTL) {
+      console.log(`Returning cached meetings data for user: ${userId}`);
+      return res.json(cachedData.data);
     }
 
     // Google Calendar API call
@@ -220,7 +272,7 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
     const totalHours = Math.floor(totalMinutes / 60);
     const extraMinutes = Math.round(totalMinutes % 60);
 
-    res.json({
+    const responseData = {
       totalMeetings,
       totalHours,
       totalMinutes: extraMinutes,
@@ -230,7 +282,18 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
         end: event.end,
         attendees: event.attendees?.length || 0,
       })),
-    });
+    };
+
+    // Cache the data
+    userCache[userId] = {
+      ...userCache[userId],
+      meetings: {
+        timestamp: Date.now(),
+        data: responseData
+      }
+    };
+
+    res.json(responseData);
   } catch (error) {
     console.error('Error fetching meetings:', error);
     res.status(500).json({ error: 'Failed to fetch meetings' });
@@ -281,6 +344,21 @@ app.get('/api/meeting-stats-image', verifyToken, async (req, res) => {
     
     if (!tokens) {
       return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Check if we have cached data for this user
+    const cachedData = userCache[userId]?.meetings;
+    if (cachedData && (Date.now() - cachedData.timestamp) < CACHE_TTL) {
+      console.log(`Returning cached stats data for user: ${userId}`);
+      
+      const stats = cachedData.data;
+      const imageUrl = "https://via.placeholder.com/1200x630/5D87E6/FFFFFF?text=Meeting+Stats:+" + 
+                      stats.totalMeetings + "+Meetings,+" + stats.totalHours + "+Hours,+" + stats.totalMinutes + "+Minutes";
+                      
+      return res.json({
+        imageUrl,
+        stats
+      });
     }
 
     // Get the user's meeting stats (reusing logic from /api/meetings)
@@ -360,13 +438,15 @@ app.get('/api/meeting-stats-image', verifyToken, async (req, res) => {
     const imageUrl = "https://via.placeholder.com/1200x630/5D87E6/FFFFFF?text=Meeting+Stats:+" + 
                       totalMeetings + "+Meetings,+" + totalHours + "+Hours,+" + extraMinutes + "+Minutes";
 
+    const statsData = {
+      totalMeetings,
+      totalHours,
+      totalMinutes: extraMinutes
+    };
+
     res.json({
       imageUrl,
-      stats: {
-        totalMeetings,
-        totalHours,
-        totalMinutes: extraMinutes
-      }
+      stats: statsData
     });
   } catch (error) {
     console.error('Error generating meeting stats image:', error);
@@ -380,6 +460,15 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
   res.status(500).json({ error: 'Something broke!' });
 });
 
-app.listen(port, () => {
+// Create server with graceful shutdown
+const server = app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+});
+
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
 }); 
