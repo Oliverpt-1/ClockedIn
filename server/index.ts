@@ -43,7 +43,7 @@ let userTokens: UserTokens = {};
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
-  `${process.env.PORT ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}` : 'http://localhost:3001'}/auth/google/callback`
+  process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3001/auth/google/callback'
 );
 
 // Middleware to verify JWT token
