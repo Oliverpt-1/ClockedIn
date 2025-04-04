@@ -18,6 +18,7 @@ const Dashboard = () => {
   const statsCardRef = useRef<HTMLDivElement>(null);
   const statsGridRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const [showAllMeetings, setShowAllMeetings] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -182,12 +183,33 @@ const Dashboard = () => {
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-gray-800">Meeting Details (Debug)</h2>
-            <button 
-              onClick={() => console.log('Full meetings data:', stats.meetings)} 
-              className="text-sm text-blue-600 hover:underline"
-            >
-              Log All Data
-            </button>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setShowAllMeetings(!showAllMeetings)} 
+                className="text-sm text-blue-600 hover:underline"
+              >
+                {showAllMeetings ? 'Show Less' : 'Show All'}
+              </button>
+              <button 
+                onClick={() => {
+                  console.log('Full meetings data:', stats.meetings);
+                  // Calculate total duration for verification
+                  let totalMin = 0;
+                  stats.meetings.forEach((meeting: any) => {
+                    if (meeting.start?.dateTime && meeting.end?.dateTime) {
+                      const start = new Date(meeting.start.dateTime);
+                      const end = new Date(meeting.end.dateTime);
+                      const duration = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+                      totalMin += duration;
+                    }
+                  });
+                  console.log(`Total duration: ${Math.floor(totalMin/60)} hours and ${totalMin%60} minutes (${totalMin} minutes)`);
+                }} 
+                className="text-sm text-blue-600 hover:underline"
+              >
+                Log All Data
+              </button>
+            </div>
           </div>
           
           <div className="overflow-auto max-h-96">
@@ -200,7 +222,7 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {stats.meetings && stats.meetings.slice(0, 10).map((meeting: any, index: number) => {
+                {stats.meetings && (showAllMeetings ? stats.meetings : stats.meetings.slice(0, 10)).map((meeting: any, index: number) => {
                   if (!meeting.start?.dateTime) return null;
                   
                   const start = new Date(meeting.start.dateTime);
@@ -223,9 +245,9 @@ const Dashboard = () => {
                 })}
               </tbody>
             </table>
-            {stats.meetings && stats.meetings.length > 10 && (
+            {!showAllMeetings && stats.meetings && stats.meetings.length > 10 && (
               <p className="text-sm text-gray-500 mt-2 text-center">
-                Showing 10 of {stats.meetings.length} meetings. Click "Log All Data" to see all.
+                Showing 10 of {stats.meetings.length} meetings. Click "Show All" to see all.
               </p>
             )}
           </div>
