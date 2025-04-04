@@ -196,8 +196,14 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
 
     const events = response.data.items || [];
     
-    // No filter - all events are considered meetings
-    const meetings = events;
+    // VERY simple exclusion system - only exclude events with specific keywords
+    const exclusionKeywords = ['party', 'fest', 'hotel', 'flight', 'vacation', 'holiday', 'dinner'];
+    const meetings = events.filter(event => {
+      const eventTitle = (event.summary || '').toLowerCase();
+      
+      // Check if the event title contains any exclusion keywords
+      return !exclusionKeywords.some(keyword => eventTitle.includes(keyword));
+    });
     
     // Debug logging for meetings
     console.log(`Found ${meetings.length} meetings in 2025 so far (from ${events.length} total events):`);
@@ -341,8 +347,14 @@ app.get('/api/meeting-stats-image', verifyToken, async (req, res) => {
 
     const events = response.data.items || [];
     
-    // No filter - all events are considered meetings
-    const meetings = events;
+    // VERY simple exclusion system - only exclude events with specific keywords
+    const exclusionKeywords = ['party', 'fest', 'hotel', 'flight', 'vacation', 'holiday', 'dinner'];
+    const meetings = events.filter(event => {
+      const eventTitle = (event.summary || '').toLowerCase();
+      
+      // Check if the event title contains any exclusion keywords
+      return !exclusionKeywords.some(keyword => eventTitle.includes(keyword));
+    });
     
     // Debug logging for meetings
     console.log(`Found ${meetings.length} meetings in 2025 so far (from ${events.length} total events):`);
