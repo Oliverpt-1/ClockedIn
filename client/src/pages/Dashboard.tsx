@@ -124,9 +124,8 @@ const Dashboard = () => {
       
       // Stats data
       const statsItems = [
-        { value: stats?.totalMeetings || 0, label: 'Meetings Attended', color: '#DBEAFE', iconColor: '#2563EB', icon: '📅' },
-        { value: stats?.totalHours || 0, label: 'Hours Spent', color: '#E0E7FF', iconColor: '#4F46E5', icon: '⏱️' },
-        { value: stats?.totalMinutes || 0, label: 'Extra Minutes', color: '#EDE9FE', iconColor: '#7C3AED', icon: '⏰' }
+        { value: `${stats?.totalHours}h ${stats?.totalMinutes}m`, label: 'Time in Meetings', color: '#DBEAFE', iconColor: '#2563EB', icon: '⏱️' },
+        { value: stats?.totalMeetings || 0, label: 'Meetings Attended', color: '#EDE9FE', iconColor: '#7C3AED', icon: '📅' }
       ];
       
       // Create each stat card
@@ -205,7 +204,7 @@ const Dashboard = () => {
       document.body.removeChild(downloadLink);
       
       // Prepare tweet content
-      const tweetText = `I've spent ${stats?.totalHours} hours and ${stats?.totalMinutes} minutes in ${stats?.totalMeetings} meetings so far in 2025! Track your own meeting stats with ClockedIn`;
+      const tweetText = `I've spent ${stats?.totalHours}h ${stats?.totalMinutes}m in ${stats?.totalMeetings} meetings so far in 2025! Track your own meeting stats with ClockedIn`;
       
       // Open Twitter/X Web Intent with just the text (no image URL)
       window.open(
@@ -243,24 +242,16 @@ const Dashboard = () => {
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8" ref={statsCardRef}>
           <h2 className="text-2xl font-semibold text-gray-800 mb-6">2025 At A Glance</h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6" ref={statsGridRef}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6" ref={statsGridRef}>
             <div className="bg-blue-50 rounded-lg p-6 flex flex-col items-center">
               <div className="p-3 bg-blue-100 rounded-full mb-4">
                 <Clock className="h-8 w-8 text-blue-600" />
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold text-blue-800">{stats.totalHours}</div>
-                <div className="text-sm text-blue-600">Hours Spent</div>
-              </div>
-            </div>
-            
-            <div className="bg-blue-50 rounded-lg p-6 flex flex-col items-center">
-              <div className="p-3 bg-blue-100 rounded-full mb-4">
-                <Clock className="h-8 w-8 text-blue-600" />
-              </div>
-              <div className="text-center">
-                <div className="text-4xl font-bold text-blue-800">{stats.totalMinutes}</div>
-                <div className="text-sm text-blue-600">Extra Minutes</div>
+                <div className="text-4xl font-bold text-blue-800">
+                  {stats.totalHours}h {stats.totalMinutes}m
+                </div>
+                <div className="text-sm text-blue-600">Time in Meetings</div>
               </div>
             </div>
             
