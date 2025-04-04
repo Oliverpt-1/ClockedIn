@@ -142,6 +142,18 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
     let totalMinutes = 0;
     const totalMeetings = events.length;
 
+    // Debug logging for meetings
+    console.log(`Found ${totalMeetings} meetings in 2024 so far:`);
+    events.forEach((event, index) => {
+      if (event.summary) {
+        const start = event.start?.dateTime ? new Date(event.start.dateTime) : null;
+        const end = event.end?.dateTime ? new Date(event.end.dateTime) : null;
+        const duration = start && end ? Math.round((end.getTime() - start.getTime()) / (1000 * 60)) : 0;
+        
+        console.log(`[${index + 1}] ${event.summary} - ${start?.toLocaleString()} (${duration} minutes)`);
+      }
+    });
+
     events.forEach(event => {
       if (event.start?.dateTime && event.end?.dateTime) {
         const start = new Date(event.start.dateTime);
@@ -158,7 +170,12 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
       totalMeetings,
       totalHours,
       totalMinutes: extraMinutes,
-      meetings: events,
+      meetings: events.map(event => ({
+        summary: event.summary || 'Untitled Meeting',
+        start: event.start,
+        end: event.end,
+        attendees: event.attendees?.length || 0,
+      })),
     });
   } catch (error) {
     console.error('Error fetching meetings:', error);

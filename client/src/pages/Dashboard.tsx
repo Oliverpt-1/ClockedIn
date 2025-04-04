@@ -127,46 +127,107 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-purple-100 flex items-center justify-center p-6 relative overflow-hidden">
-      <div ref={statsCardRef} className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-8 max-w-2xl w-full relative z-10">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-purple-100 py-12 px-4">
+      <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-semibold text-blue-800">
-            Your Meeting History 2024
-          </h1>
-          <button
+          <h1 className="text-3xl font-bold text-blue-900">Your Meeting Stats</h1>
+          <button 
             onClick={() => {
               localStorage.removeItem('auth_token');
-              navigate('/');
+              window.location.href = '/';
             }}
-            className="px-4 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
           >
             Sign Out
           </button>
         </div>
         
-        <div ref={statsGridRef} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-blue-50 rounded-xl p-6 text-center transform hover:scale-105 transition-transform">
-            <div className="bg-blue-200 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Users className="w-8 h-8 text-blue-700" />
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8" ref={statsCardRef}>
+          <h2 className="text-2xl font-semibold text-gray-800 mb-6">2024 At A Glance</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6" ref={statsGridRef}>
+            <div className="bg-blue-50 rounded-lg p-6 flex flex-col items-center">
+              <div className="p-3 bg-blue-100 rounded-full mb-4">
+                <Clock className="h-8 w-8 text-blue-600" />
+              </div>
+              <div className="text-center">
+                <div className="text-4xl font-bold text-blue-800">{stats.totalHours}</div>
+                <div className="text-sm text-blue-600">Hours Spent</div>
+              </div>
             </div>
-            <h2 className="text-2xl font-bold text-blue-900">{stats.totalMeetings}</h2>
-            <p className="text-blue-600">Total Meetings</p>
+            
+            <div className="bg-blue-50 rounded-lg p-6 flex flex-col items-center">
+              <div className="p-3 bg-blue-100 rounded-full mb-4">
+                <Clock className="h-8 w-8 text-blue-600" />
+              </div>
+              <div className="text-center">
+                <div className="text-4xl font-bold text-blue-800">{stats.totalMinutes}</div>
+                <div className="text-sm text-blue-600">Extra Minutes</div>
+              </div>
+            </div>
+            
+            <div className="bg-blue-50 rounded-lg p-6 flex flex-col items-center">
+              <div className="p-3 bg-blue-100 rounded-full mb-4">
+                <Users className="h-8 w-8 text-blue-600" />
+              </div>
+              <div className="text-center">
+                <div className="text-4xl font-bold text-blue-800">{stats.totalMeetings}</div>
+                <div className="text-sm text-blue-600">Meetings Attended</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Debug section to verify meetings data */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-800">Meeting Details (Debug)</h2>
+            <button 
+              onClick={() => console.log('Full meetings data:', stats.meetings)} 
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Log All Data
+            </button>
           </div>
           
-          <div className="bg-purple-50 rounded-xl p-6 text-center transform hover:scale-105 transition-transform">
-            <div className="bg-purple-200 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Clock className="w-8 h-8 text-purple-700" />
-            </div>
-            <h2 className="text-2xl font-bold text-purple-900">{stats.totalHours}</h2>
-            <p className="text-purple-600">Hours Spent</p>
-          </div>
-          
-          <div className="bg-pink-50 rounded-xl p-6 text-center transform hover:scale-105 transition-transform">
-            <div className="bg-pink-200 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Clock className="w-8 h-8 text-pink-700" />
-            </div>
-            <h2 className="text-2xl font-bold text-pink-900">{stats.totalMinutes}</h2>
-            <p className="text-pink-600">Extra Minutes</p>
+          <div className="overflow-auto max-h-96">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meeting</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {stats.meetings && stats.meetings.slice(0, 10).map((meeting: any, index: number) => {
+                  if (!meeting.start?.dateTime) return null;
+                  
+                  const start = new Date(meeting.start.dateTime);
+                  const end = new Date(meeting.end.dateTime);
+                  const duration = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+                  
+                  return (
+                    <tr key={index}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {meeting.summary || 'Untitled Meeting'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {start.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {duration} minutes
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {stats.meetings && stats.meetings.length > 10 && (
+              <p className="text-sm text-gray-500 mt-2 text-center">
+                Showing 10 of {stats.meetings.length} meetings. Click "Log All Data" to see all.
+              </p>
+            )}
           </div>
         </div>
         
