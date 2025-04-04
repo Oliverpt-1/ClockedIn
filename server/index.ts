@@ -237,6 +237,108 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
   }
 });
 
+// Add endpoint to generate and return meeting stats image URL
+app.get('/api/meeting-stats-image', verifyToken, async (req, res) => {
+  try {
+    const userId = (req.user as any).userId;
+    const tokens = userTokens[userId];
+    
+    if (!tokens) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Get the user's meeting stats (reusing logic from /api/meetings)
+    oauth2Client.setCredentials(tokens);
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    // Get events from the beginning of 2025 only
+    const startDate = new Date('2025-01-01T00:00:00Z');
+    const endDate = new Date('2025-12-31T23:59:59Z');
+    const now = new Date();
+    
+    // Use the earlier of now or end of 2025 as the end date
+    const timeMax = now < endDate ? now.toISOString() : endDate.toISOString();
+
+    const response = await calendar.events.list({
+      calendarId: 'primary',
+      timeMin: startDate.toISOString(),
+      timeMax: timeMax,
+      singleEvents: true,
+      orderBy: 'startTime',
+    });
+
+    const events = response.data.items || [];
+    
+    // Filter for meetings (using same logic as in /api/meetings)
+    const meetings = events.filter(event => {
+      const hasConferenceLink = !!event.conferenceData || 
+        (event.description && 
+          (event.description?.includes('zoom.') || 
+           event.description?.includes('meet.google') || 
+           event.description?.includes('teams.microsoft')));
+      
+      const hasMultipleAttendees = event.attendees && event.attendees.length > 1;
+      
+      const hasMeetingKeywords = event.summary && 
+        (/meeting|call|sync|standup|catch[ -]up|1:1|1on1|review|discussion|interview|agenda|presentation|weekly/i).test(event.summary);
+      
+      const hasNonMeetingKeywords = event.summary && 
+        (/party|social|game|karting|drinks|celebration|concert|movie|finalist|announced|optional|check[ -]out|pitching|dinner|deadline/i).test(event.summary);
+      
+      const isWorkHours = () => {
+        if (!event.start?.dateTime) return false;
+        const date = new Date(event.start.dateTime);
+        const isWeekday = date.getDay() >= 1 && date.getDay() <= 5;
+        const hour = date.getHours();
+        return isWeekday && hour >= 9 && hour < 18;
+      };
+      
+      const isPersonal = event.summary && 
+        (/vacation|holiday|day off|leave|break|lunch|personal/i).test(event.summary);
+      
+      const isMeeting = (
+        (hasConferenceLink || hasMultipleAttendees || hasMeetingKeywords || (isWorkHours() && !hasNonMeetingKeywords)) 
+        && !isPersonal 
+        && !hasNonMeetingKeywords
+      );
+      
+      return isMeeting;
+    });
+
+    let totalMinutes = 0;
+    const totalMeetings = meetings.length;
+
+    meetings.forEach(event => {
+      if (event.start?.dateTime && event.end?.dateTime) {
+        const start = new Date(event.start.dateTime);
+        const end = new Date(event.end.dateTime);
+        const duration = (end.getTime() - start.getTime()) / (1000 * 60);
+        totalMinutes += duration;
+      }
+    });
+
+    const totalHours = Math.floor(totalMinutes / 60);
+    const extraMinutes = Math.round(totalMinutes % 60);
+
+    // In a real implementation, you would generate an actual image here
+    // For this demo, we'll just use a placeholder image URL
+    const imageUrl = "https://via.placeholder.com/1200x630/5D87E6/FFFFFF?text=Meeting+Stats:+" + 
+                      totalMeetings + "+Meetings,+" + totalHours + "+Hours,+" + extraMinutes + "+Minutes";
+
+    res.json({
+      imageUrl,
+      stats: {
+        totalMeetings,
+        totalHours,
+        totalMinutes: extraMinutes
+      }
+    });
+  } catch (error) {
+    console.error('Error generating meeting stats image:', error);
+    res.status(500).json({ error: 'Failed to generate meeting stats image' });
+  }
+});
+
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error(err.stack);

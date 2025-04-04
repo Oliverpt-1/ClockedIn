@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Clock, Users, Twitter, Share2 } from 'lucide-react';
+import { Clock, Users, Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 
@@ -112,9 +112,9 @@ const Dashboard = () => {
       const data = await response.json();
       
       // Prepare tweet content
-      const tweetText = `I've spent ${data.stats.totalHours} hours and ${data.stats.totalMinutes} minutes in ${data.stats.totalMeetings} meetings so far this year! Track your own meeting stats with ClockedIn`;
+      const tweetText = `I've spent ${data.stats.totalHours} hours and ${data.stats.totalMinutes} minutes in ${data.stats.totalMeetings} meetings so far in 2025! Track your own meeting stats with ClockedIn`;
       
-      // Open Twitter Web Intent with the image URL
+      // Open Twitter/X Web Intent with the image URL (updated for X)
       window.open(
         `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(data.imageUrl)}`,
         "_blank"
@@ -124,6 +124,7 @@ const Dashboard = () => {
     } catch (err) {
       console.error('Error sharing stats:', err);
       setSharingImage(false);
+      alert('Failed to share your stats. Please try again later.');
     }
   };
 
@@ -186,7 +187,7 @@ const Dashboard = () => {
             <div className="flex gap-4">
               <button 
                 onClick={() => setShowAllMeetings(!showAllMeetings)} 
-                className="text-sm px-4 py-2 bg-lavender-100 text-indigo-700 rounded-lg hover:bg-lavender-200 transition-all duration-300 ease-in-out"
+                className="text-sm px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-all duration-300 ease-in-out"
               >
                 {showAllMeetings ? 'Show Less' : 'Show All'}
               </button>
