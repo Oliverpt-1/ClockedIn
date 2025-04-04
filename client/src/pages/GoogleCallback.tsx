@@ -10,13 +10,18 @@ const GoogleCallback = ({ setIsAuthenticated }: GoogleCallbackProps) => {
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
+    console.log("GoogleCallback component mounted");
+    console.log("Search params:", Object.fromEntries(searchParams.entries()));
+    
     const token = searchParams.get('token');
     if (token) {
+      console.log("Token found, storing in localStorage");
       // Store token in localStorage
       localStorage.setItem('auth_token', token);
       setIsAuthenticated(true);
       navigate('/dashboard');
     } else {
+      console.error("No token found in URL");
       navigate('/?error=auth_failed');
     }
   }, [searchParams, setIsAuthenticated, navigate]);

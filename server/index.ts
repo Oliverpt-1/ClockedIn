@@ -16,7 +16,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 
 // Middleware setup
 app.use(cors({
-  origin: FRONTEND_URL,
+  origin: ['https://clocked-in.vercel.app', 'http://localhost:5173'],
   credentials: true,
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type', 'Authorization']
