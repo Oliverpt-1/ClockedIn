@@ -95,8 +95,8 @@ app.get('/auth/google/callback', async (req, res) => {
     // Create JWT token
     const token = jwt.sign({ userId, authenticated: true }, JWT_SECRET, { expiresIn: '24h' });
     
-    // Redirect with token
-    res.redirect(`${FRONTEND_URL}/auth/google/callback?token=${token}`);
+    // Redirect with token - hardcoded for reliability
+    res.redirect(`https://clocked-in.vercel.app/auth/google/callback?token=${token}`);
   } catch (error) {
     console.error('Error during Google authentication:', error);
     // Log specific error details
@@ -104,7 +104,7 @@ app.get('/auth/google/callback', async (req, res) => {
       console.error('Error message:', error.message);
       console.error('Error stack:', error.stack);
     }
-    res.redirect(`${FRONTEND_URL}?error=auth_failed&reason=${encodeURIComponent('Failed to exchange authorization code')}`);
+    res.redirect(`https://clocked-in.vercel.app?error=auth_failed&reason=${encodeURIComponent('Failed to exchange authorization code')}`);
   }
 });
 
