@@ -97,12 +97,6 @@ const Dashboard = () => {
     try {
       setSharingImage(true);
       
-      // Get the auth token
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
-      
       // Create a clone of the stats card for capturing (to avoid styling issues)
       const statsContainer = document.createElement('div');
       statsContainer.style.width = '1200px';
@@ -198,43 +192,29 @@ const Dashboard = () => {
         useCORS: true
       });
       
-      // Convert to base64 image
-      const imageData = canvas.toDataURL('image/png');
-      
       // Remove the temporary element
       document.body.removeChild(statsContainer);
       
-      // Send the image to the server
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meeting-stats-image`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          imageData,
-          stats: {
-            totalMeetings: stats?.totalMeetings || 0,
-            totalHours: stats?.totalHours || 0,
-            totalMinutes: stats?.totalMinutes || 0
-          }
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate stats image');
-      }
-
-      const data = await response.json();
+      // Download the image locally
+      const imageData = canvas.toDataURL('image/png');
+      const downloadLink = document.createElement('a');
+      downloadLink.href = imageData;
+      downloadLink.download = 'my-meeting-stats-2025.png';
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
       
       // Prepare tweet content
       const tweetText = `I've spent ${stats?.totalHours} hours and ${stats?.totalMinutes} minutes in ${stats?.totalMeetings} meetings so far in 2025! Track your own meeting stats with ClockedIn`;
       
-      // Open Twitter/X Web Intent with the image URL
+      // Open Twitter/X Web Intent with just the text (no image URL)
       window.open(
-        `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(data.imageUrl)}`,
+        `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`,
         "_blank"
       );
+      
+      // Show a success message
+      alert('Your stats image has been downloaded. You can now attach it to your tweet!');
       
       setSharingImage(false);
     } catch (err) {
@@ -420,7 +400,7 @@ const Dashboard = () => {
               ) : (
                 <>
                   <Share2 size={18} />
-                  <span>Share on X</span>
+                  <span>Download & Share Stats</span>
                 </>
               )}
             </button>
