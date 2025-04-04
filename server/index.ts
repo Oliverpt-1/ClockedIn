@@ -21,7 +21,7 @@ app.use(cors({
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use(session({
   secret: JWT_SECRET,
   resave: false,
@@ -238,7 +238,43 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
 });
 
 // Add endpoint to generate and return meeting stats image URL
+app.post('/api/meeting-stats-image', verifyToken, async (req, res) => {
+  try {
+    const userId = (req.user as any).userId;
+    const tokens = userTokens[userId];
+    
+    if (!tokens) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    // Get the base64 image data from the request body
+    const { imageData, stats } = req.body;
+    
+    if (!imageData) {
+      return res.status(400).json({ error: 'No image data provided' });
+    }
+
+    // In a real implementation, you would:
+    // 1. Upload the image to a cloud storage (AWS S3, Cloudinary, etc.)
+    // 2. Return a permanent URL to the image
+    
+    // For this demo, we'll just return the stats and the base64 data
+    // In a real implementation, this would be a URL to the uploaded image
+    const imageUrl = imageData;
+
+    res.json({
+      imageUrl,
+      stats
+    });
+  } catch (error) {
+    console.error('Error processing meeting stats image:', error);
+    res.status(500).json({ error: 'Failed to process meeting stats image' });
+  }
+});
+
+// Change GET to POST for the above endpoint
 app.get('/api/meeting-stats-image', verifyToken, async (req, res) => {
+  // This is kept for backward compatibility
   try {
     const userId = (req.user as any).userId;
     const tokens = userTokens[userId];
@@ -320,8 +356,7 @@ app.get('/api/meeting-stats-image', verifyToken, async (req, res) => {
     const totalHours = Math.floor(totalMinutes / 60);
     const extraMinutes = Math.round(totalMinutes % 60);
 
-    // In a real implementation, you would generate an actual image here
-    // For this demo, we'll just use a placeholder image URL
+    // For backward compatibility, return a placeholder image
     const imageUrl = "https://via.placeholder.com/1200x630/5D87E6/FFFFFF?text=Meeting+Stats:+" + 
                       totalMeetings + "+Meetings,+" + totalHours + "+Hours,+" + extraMinutes + "+Minutes";
 

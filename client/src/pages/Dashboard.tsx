@@ -97,12 +97,128 @@ const Dashboard = () => {
     try {
       setSharingImage(true);
       
-      // Get the image URL from the server
+      // Get the auth token
       const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+      
+      // Create a clone of the stats card for capturing (to avoid styling issues)
+      const statsContainer = document.createElement('div');
+      statsContainer.style.width = '1200px';
+      statsContainer.style.padding = '40px';
+      statsContainer.style.backgroundColor = 'white';
+      statsContainer.style.borderRadius = '16px';
+      statsContainer.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+      
+      // Add a title
+      const title = document.createElement('h1');
+      title.innerText = 'My 2025 Meeting Stats';
+      title.style.fontSize = '36px';
+      title.style.fontWeight = 'bold';
+      title.style.color = '#2563EB';
+      title.style.marginBottom = '32px';
+      title.style.textAlign = 'center';
+      statsContainer.appendChild(title);
+      
+      // Create grid for stats
+      const statsGrid = document.createElement('div');
+      statsGrid.style.display = 'flex';
+      statsGrid.style.justifyContent = 'space-between';
+      statsGrid.style.gap = '24px';
+      statsGrid.style.marginBottom = '32px';
+      
+      // Stats data
+      const statsItems = [
+        { value: stats?.totalMeetings || 0, label: 'Meetings Attended', color: '#DBEAFE', iconColor: '#2563EB', icon: '📅' },
+        { value: stats?.totalHours || 0, label: 'Hours Spent', color: '#E0E7FF', iconColor: '#4F46E5', icon: '⏱️' },
+        { value: stats?.totalMinutes || 0, label: 'Extra Minutes', color: '#EDE9FE', iconColor: '#7C3AED', icon: '⏰' }
+      ];
+      
+      // Create each stat card
+      statsItems.forEach(item => {
+        const statCard = document.createElement('div');
+        statCard.style.flex = '1';
+        statCard.style.backgroundColor = item.color;
+        statCard.style.borderRadius = '12px';
+        statCard.style.padding = '24px';
+        statCard.style.display = 'flex';
+        statCard.style.flexDirection = 'column';
+        statCard.style.alignItems = 'center';
+        statCard.style.textAlign = 'center';
+        
+        // Icon
+        const iconWrapper = document.createElement('div');
+        iconWrapper.style.fontSize = '32px';
+        iconWrapper.style.marginBottom = '16px';
+        iconWrapper.innerText = item.icon;
+        statCard.appendChild(iconWrapper);
+        
+        // Value
+        const valueElement = document.createElement('div');
+        valueElement.innerText = item.value.toString();
+        valueElement.style.fontSize = '48px';
+        valueElement.style.fontWeight = 'bold';
+        valueElement.style.color = item.iconColor;
+        valueElement.style.lineHeight = '1';
+        valueElement.style.marginBottom = '8px';
+        statCard.appendChild(valueElement);
+        
+        // Label
+        const labelElement = document.createElement('div');
+        labelElement.innerText = item.label;
+        labelElement.style.fontSize = '16px';
+        labelElement.style.color = item.iconColor;
+        statCard.appendChild(labelElement);
+        
+        statsGrid.appendChild(statCard);
+      });
+      
+      statsContainer.appendChild(statsGrid);
+      
+      // Add a footer
+      const footer = document.createElement('div');
+      footer.style.textAlign = 'center';
+      footer.style.fontSize = '14px';
+      footer.style.color = '#6B7280';
+      footer.innerText = 'Made with ClockedIn - Track your meeting time in 2025';
+      statsContainer.appendChild(footer);
+      
+      // Append to body temporarily (invisible)
+      statsContainer.style.position = 'absolute';
+      statsContainer.style.left = '-9999px';
+      document.body.appendChild(statsContainer);
+      
+      // Use html2canvas to capture the card
+      const canvas = await html2canvas(statsContainer, {
+        scale: 2, // Higher resolution
+        backgroundColor: null,
+        logging: false,
+        allowTaint: true,
+        useCORS: true
+      });
+      
+      // Convert to base64 image
+      const imageData = canvas.toDataURL('image/png');
+      
+      // Remove the temporary element
+      document.body.removeChild(statsContainer);
+      
+      // Send the image to the server
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meeting-stats-image`, {
+        method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify({
+          imageData,
+          stats: {
+            totalMeetings: stats?.totalMeetings || 0,
+            totalHours: stats?.totalHours || 0,
+            totalMinutes: stats?.totalMinutes || 0
+          }
+        })
       });
 
       if (!response.ok) {
@@ -112,9 +228,9 @@ const Dashboard = () => {
       const data = await response.json();
       
       // Prepare tweet content
-      const tweetText = `I've spent ${data.stats.totalHours} hours and ${data.stats.totalMinutes} minutes in ${data.stats.totalMeetings} meetings so far in 2025! Track your own meeting stats with ClockedIn`;
+      const tweetText = `I've spent ${stats?.totalHours} hours and ${stats?.totalMinutes} minutes in ${stats?.totalMeetings} meetings so far in 2025! Track your own meeting stats with ClockedIn`;
       
-      // Open Twitter/X Web Intent with the image URL (updated for X)
+      // Open Twitter/X Web Intent with the image URL
       window.open(
         `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(data.imageUrl)}`,
         "_blank"
