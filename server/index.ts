@@ -196,113 +196,11 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
 
     const events = response.data.items || [];
     
-    // Filter for meetings (using same logic as in /api/meetings)
-    const meetings = events.filter(event => {
-      // Extract the summary text (title) and description and convert to lowercase for matching
-      const eventTitle = (event.summary || '').toLowerCase();
-      const eventDescription = (event.description || '').toLowerCase();
-      
-      // FIRST: Check for explicit non-meeting indicators (hard NOs)
-      const nonMeetingKeywords = [
-        // Social events
-        'party', 'social', 'celebration', 'happy hour', 'drinks', 'dinner', 'lunch', 
-        
-        // Entertainment
-        'movie', 'concert', 'show', 'performance', 'theater', 'theatre', 'game', 'watch', 
-        
-        // Travel related
-        'flight', 'check-in', 'checkout', 'hotel', 'airport', 'departure', 'arrival', 'travel',
-        
-        // Events and festivals
-        'fest', 'festival', 'conference', 'expo', 'exhibition', 'convention', 'gala', 'ceremony',
-        
-        // Announcements and broadcasts
-        'announcement', 'announced', 'broadcast', 'finalist', 'award', 'ceremony',
-        
-        // Recreational
-        'karting', 'golf', 'sports', 'tournament', 'race', 'gym', 'workout', 'exercise',
-        
-        // Personal time
-        'doctor', 'appointment', 'birthday', 'anniversary', 'wedding', 'funeral',
-        
-        // Special events
-        'holiday', 'vacation', 'pto', 'day off', 'leave', 'break', 'out of office', 'ooo',
-        
-        // Low priority events
-        'optional', 'fyi', 'check-out', 'reminder'
-      ];
-      
-      // Create a regex pattern from the non-meeting keywords
-      const nonMeetingPattern = new RegExp(`\\b(${nonMeetingKeywords.join('|')})\\b`, 'i');
-      
-      // Check for hard NO keywords in title or description
-      if (nonMeetingPattern.test(eventTitle) || nonMeetingPattern.test(eventDescription)) {
-        return false;
-      }
-      
-      // SECOND: Check for explicit meeting indicators (hard YES)
-      const meetingKeywords = [
-        // Common meeting terms
-        'meeting', 'sync', 'catchup', 'catch-up', 'catch up', '1:1', '1on1', 'one on one', 'one-on-one',
-        
-        // Meeting types
-        'standup', 'stand-up', 'planning', 'review', 'retrospective', 'retro', 'demo', 'showcase',
-        'check-in', 'check in', 'follow-up', 'follow up',
-        
-        // Business discussions
-        'discussion', 'call', 'interview', 'debrief', 'alignment',
-        
-        // Meeting formats
-        'workshop', 'session', 'working session', 'brainstorm', 'briefing', 'presentation',
-        'training', 'seminar', 'committee',
-        
-        // Regular meetings
-        'weekly', 'daily', 'monthly', 'quarterly', 'team', 'all-hands', 'status update'
-      ];
-      
-      // Create a regex pattern from the meeting keywords
-      const meetingPattern = new RegExp(`\\b(${meetingKeywords.join('|')})\\b`, 'i');
-      
-      // Check for hard YES keywords in title
-      if (meetingPattern.test(eventTitle)) {
-        return true;
-      }
-      
-      // THIRD: Check for strong meeting indicators if no explicit keywords were found
-      
-      // Video conferencing is a strong indicator of a meeting
-      if (event.conferenceData) {
-        return true;
-      }
-      
-      // Check for conferencing links in the description
-      const conferencePatterns = [
-        'zoom.us', 'meet.google', 'teams.microsoft', 'webex.com', 'gotomeeting.com', 
-        'bluejeans.com', 'whereby.com', 'meet.jit.si', 'hangouts.google', 'chime.aws'
-      ];
-      const conferenceRegex = new RegExp(conferencePatterns.join('|'), 'i');
-      if (event.description && conferenceRegex.test(event.description)) {
-        return true;
-      }
-      
-      // Check for location that indicates a meeting room
-      const location = (event.location || '').toLowerCase();
-      if (location.includes('room') || location.includes('conference') || location.includes('meeting')) {
-        return true;
-      }
-      
-      // Check for multiple attendees (strong indicator for a meeting)
-      const attendeeCount = event.attendees?.length || 0;
-      if (attendeeCount > 1 && attendeeCount < 30) {  // More than 1 person but less than mass event
-        return true;
-      }
-      
-      // By default, don't count it as a meeting if none of the above conditions match
-      return false;
-    });
+    // No filter - all events are considered meetings
+    const meetings = events;
     
     // Debug logging for meetings
-    console.log(`Found ${meetings.length} meetings in 2025 so far (filtered from ${events.length} total events):`);
+    console.log(`Found ${meetings.length} meetings in 2025 so far (from ${events.length} total events):`);
     meetings.forEach((event, index) => {
       if (event.summary) {
         const start = event.start?.dateTime ? new Date(event.start.dateTime) : null;
@@ -443,109 +341,23 @@ app.get('/api/meeting-stats-image', verifyToken, async (req, res) => {
 
     const events = response.data.items || [];
     
-    // Filter for meetings (using same logic as in /api/meetings)
-    const meetings = events.filter(event => {
-      // Extract the summary text (title) and description and convert to lowercase for matching
-      const eventTitle = (event.summary || '').toLowerCase();
-      const eventDescription = (event.description || '').toLowerCase();
-      
-      // FIRST: Check for explicit non-meeting indicators (hard NOs)
-      const nonMeetingKeywords = [
-        // Social events
-        'party', 'social', 'celebration', 'happy hour', 'drinks', 'dinner', 'lunch', 
+    // No filter - all events are considered meetings
+    const meetings = events;
+    
+    // Debug logging for meetings
+    console.log(`Found ${meetings.length} meetings in 2025 so far (from ${events.length} total events):`);
+    meetings.forEach((event, index) => {
+      if (event.summary) {
+        const start = event.start?.dateTime ? new Date(event.start.dateTime) : null;
+        const end = event.end?.dateTime ? new Date(event.end.dateTime) : null;
+        const duration = start && end ? Math.round((end.getTime() - start.getTime()) / (1000 * 60)) : 0;
         
-        // Entertainment
-        'movie', 'concert', 'show', 'performance', 'theater', 'theatre', 'game', 'watch', 
+        const meetingType = [];
+        if (event.conferenceData) meetingType.push("Video");
+        if (event.attendees && event.attendees.length > 1) meetingType.push(`${event.attendees.length} attendees`);
         
-        // Travel related
-        'flight', 'check-in', 'checkout', 'hotel', 'airport', 'departure', 'arrival', 'travel',
-        
-        // Events and festivals
-        'fest', 'festival', 'conference', 'expo', 'exhibition', 'convention', 'gala', 'ceremony',
-        
-        // Announcements and broadcasts
-        'announcement', 'announced', 'broadcast', 'finalist', 'award', 'ceremony',
-        
-        // Recreational
-        'karting', 'golf', 'sports', 'tournament', 'race', 'gym', 'workout', 'exercise',
-        
-        // Personal time
-        'doctor', 'appointment', 'birthday', 'anniversary', 'wedding', 'funeral',
-        
-        // Special events
-        'holiday', 'vacation', 'pto', 'day off', 'leave', 'break', 'out of office', 'ooo',
-        
-        // Low priority events
-        'optional', 'fyi', 'check-out', 'reminder'
-      ];
-      
-      // Create a regex pattern from the non-meeting keywords
-      const nonMeetingPattern = new RegExp(`\\b(${nonMeetingKeywords.join('|')})\\b`, 'i');
-      
-      // Check for hard NO keywords in title or description
-      if (nonMeetingPattern.test(eventTitle) || nonMeetingPattern.test(eventDescription)) {
-        return false;
+        console.log(`[${index + 1}] ${event.summary} - ${start?.toLocaleString()} (${duration} minutes) [${meetingType.join(', ')}]`);
       }
-      
-      // SECOND: Check for explicit meeting indicators (hard YES)
-      const meetingKeywords = [
-        // Common meeting terms
-        'meeting', 'sync', 'catchup', 'catch-up', 'catch up', '1:1', '1on1', 'one on one', 'one-on-one',
-        
-        // Meeting types
-        'standup', 'stand-up', 'planning', 'review', 'retrospective', 'retro', 'demo', 'showcase',
-        'check-in', 'check in', 'follow-up', 'follow up',
-        
-        // Business discussions
-        'discussion', 'call', 'interview', 'debrief', 'alignment',
-        
-        // Meeting formats
-        'workshop', 'session', 'working session', 'brainstorm', 'briefing', 'presentation',
-        'training', 'seminar', 'committee',
-        
-        // Regular meetings
-        'weekly', 'daily', 'monthly', 'quarterly', 'team', 'all-hands', 'status update'
-      ];
-      
-      // Create a regex pattern from the meeting keywords
-      const meetingPattern = new RegExp(`\\b(${meetingKeywords.join('|')})\\b`, 'i');
-      
-      // Check for hard YES keywords in title
-      if (meetingPattern.test(eventTitle)) {
-        return true;
-      }
-      
-      // THIRD: Check for strong meeting indicators if no explicit keywords were found
-      
-      // Video conferencing is a strong indicator of a meeting
-      if (event.conferenceData) {
-        return true;
-      }
-      
-      // Check for conferencing links in the description
-      const conferencePatterns = [
-        'zoom.us', 'meet.google', 'teams.microsoft', 'webex.com', 'gotomeeting.com', 
-        'bluejeans.com', 'whereby.com', 'meet.jit.si', 'hangouts.google', 'chime.aws'
-      ];
-      const conferenceRegex = new RegExp(conferencePatterns.join('|'), 'i');
-      if (event.description && conferenceRegex.test(event.description)) {
-        return true;
-      }
-      
-      // Check for location that indicates a meeting room
-      const location = (event.location || '').toLowerCase();
-      if (location.includes('room') || location.includes('conference') || location.includes('meeting')) {
-        return true;
-      }
-      
-      // Check for multiple attendees (strong indicator for a meeting)
-      const attendeeCount = event.attendees?.length || 0;
-      if (attendeeCount > 1 && attendeeCount < 30) {  // More than 1 person but less than mass event
-        return true;
-      }
-      
-      // By default, don't count it as a meeting if none of the above conditions match
-      return false;
     });
 
     let totalMinutes = 0;
