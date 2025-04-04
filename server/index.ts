@@ -157,14 +157,36 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
       const hasMultipleAttendees = event.attendees && event.attendees.length > 1;
       
       // Check event title for meeting keywords
-      const isMeetingByName = event.summary && 
-        (/meeting|call|sync|standup|catch[ -]up|1:1|1on1|review|discussion/i).test(event.summary);
+      const hasMeetingKeywords = event.summary && 
+        (/meeting|call|sync|standup|catch[ -]up|1:1|1on1|review|discussion|interview|agenda|presentation|weekly/i).test(event.summary);
+      
+      // Check for keywords that indicate non-meetings
+      const hasNonMeetingKeywords = event.summary && 
+        (/party|social|game|karting|drinks|celebration|concert|movie|finalist|announced|optional|check[ -]out|pitching|dinner|deadline/i).test(event.summary);
+      
+      // Check if event is during work hours (9am-6pm weekdays)
+      const isWorkHours = () => {
+        if (!event.start?.dateTime) return false;
+        const date = new Date(event.start.dateTime);
+        const isWeekday = date.getDay() >= 1 && date.getDay() <= 5;
+        const hour = date.getHours();
+        return isWeekday && hour >= 9 && hour < 18;
+      };
       
       // Exclude personal events
       const isPersonal = event.summary && 
         (/vacation|holiday|day off|leave|break|lunch|personal/i).test(event.summary);
       
-      return (hasConferenceLink || hasMultipleAttendees || isMeetingByName) && !isPersonal;
+      // Determine if it's a work meeting
+      const isMeeting = (
+        // Must have at least one meeting indicator
+        (hasConferenceLink || hasMultipleAttendees || hasMeetingKeywords || (isWorkHours() && !hasNonMeetingKeywords)) 
+        // And must not be excluded
+        && !isPersonal 
+        && !hasNonMeetingKeywords
+      );
+      
+      return isMeeting;
     });
     
     // Debug logging for meetings
