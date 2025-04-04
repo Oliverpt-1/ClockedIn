@@ -28,7 +28,7 @@ const Dashboard = () => {
           throw new Error('Not authenticated');
         }
 
-        const response = await fetch('http://localhost:3001/api/meetings', {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meetings`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -93,160 +93,35 @@ const Dashboard = () => {
 
   // Function to capture stats as image and share
   const captureAndShare = async () => {
-    if (!statsGridRef.current) return;
-    
     try {
       setSharingImage(true);
       
-      // Create a white background div for better image capture
-      const captureContainer = document.createElement('div');
-      captureContainer.style.position = 'fixed';
-      captureContainer.style.left = '-9999px';
-      captureContainer.style.background = 'white';
-      captureContainer.style.padding = '20px';
-      captureContainer.style.borderRadius = '12px';
-      
-      // Clone the stats grid for capture
-      const statsClone = statsGridRef.current.cloneNode(true) as HTMLDivElement;
-      
-      // Add title
-      const title = document.createElement('h2');
-      title.textContent = 'Your Meeting History 2024';
-      title.style.textAlign = 'center';
-      title.style.color = '#1e40af';
-      title.style.fontSize = '24px';
-      title.style.fontWeight = 'bold';
-      title.style.marginBottom = '16px';
-      
-      // Add footer
-      const footer = document.createElement('p');
-      footer.textContent = 'Tracking your collaborative journey through 2024';
-      footer.style.textAlign = 'center';
-      footer.style.color = '#3b82f6';
-      footer.style.fontSize = '14px';
-      footer.style.marginTop = '16px';
-      
-      // Assemble capture container
-      captureContainer.appendChild(title);
-      captureContainer.appendChild(statsClone);
-      captureContainer.appendChild(footer);
-      document.body.appendChild(captureContainer);
-      
-      // Capture the image
-      const canvas = await html2canvas(captureContainer, {
-        backgroundColor: 'white',
-        scale: 2, // Higher quality
+      // Get the image URL from the server
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/meeting-stats-image`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate stats image');
+      }
+
+      const data = await response.json();
       
-      // Remove capture container
-      document.body.removeChild(captureContainer);
+      // Prepare tweet content
+      const tweetText = `I've spent ${data.stats.totalHours} hours and ${data.stats.totalMinutes} minutes in ${data.stats.totalMeetings} meetings so far this year! Track your own meeting stats with ClockedIn`;
       
-      // Convert to image
-      const image = canvas.toDataURL('image/png');
-      
-      // Create a temporary image element to show in modal
-      const imgElement = document.createElement('img');
-      imgElement.src = image;
-      imgElement.style.maxWidth = '100%';
-      imgElement.style.borderRadius = '8px';
-      imgElement.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-      
-      // Create a modal to show the image and instructions
-      const modal = document.createElement('div');
-      modal.style.position = 'fixed';
-      modal.style.top = '0';
-      modal.style.left = '0';
-      modal.style.width = '100%';
-      modal.style.height = '100%';
-      modal.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-      modal.style.display = 'flex';
-      modal.style.flexDirection = 'column';
-      modal.style.alignItems = 'center';
-      modal.style.justifyContent = 'center';
-      modal.style.padding = '20px';
-      modal.style.zIndex = '9999';
-      modal.style.overflowY = 'auto';
-      
-      // Create container for content
-      const contentContainer = document.createElement('div');
-      contentContainer.style.backgroundColor = 'white';
-      contentContainer.style.borderRadius = '12px';
-      contentContainer.style.padding = '20px';
-      contentContainer.style.maxWidth = '500px';
-      contentContainer.style.width = '100%';
-      contentContainer.style.textAlign = 'center';
-      contentContainer.style.position = 'relative';
-      
-      // Create close button
-      const closeButton = document.createElement('button');
-      closeButton.textContent = '×';
-      closeButton.style.position = 'absolute';
-      closeButton.style.top = '10px';
-      closeButton.style.right = '10px';
-      closeButton.style.backgroundColor = 'transparent';
-      closeButton.style.border = 'none';
-      closeButton.style.fontSize = '24px';
-      closeButton.style.cursor = 'pointer';
-      closeButton.style.color = '#666';
-      closeButton.onclick = () => {
-        document.body.removeChild(modal);
-        setSharingImage(false);
-      };
-      
-      // Create heading
-      const heading = document.createElement('h3');
-      heading.textContent = 'Your Meeting Stats Image';
-      heading.style.marginBottom = '15px';
-      heading.style.fontSize = '18px';
-      heading.style.fontWeight = 'bold';
-      
-      // Create instructions
-      const instructions = document.createElement('p');
-      instructions.innerHTML = '1. Save this image by right-clicking it<br>2. Click "Share on X" below to compose your tweet<br>3. Attach this image to your tweet';
-      instructions.style.marginBottom = '15px';
-      instructions.style.fontSize = '14px';
-      instructions.style.color = '#555';
-      instructions.style.textAlign = 'left';
-      instructions.style.marginLeft = '30px';
-      
-      // Create share on X button
-      const shareButton = document.createElement('button');
-      shareButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 2H6C3.79086 2 2 3.79086 2 6V18C2 20.2091 3.79086 22 6 22H18C20.2091 22 22 20.2091 22 18V6C22 3.79086 20.2091 2 18 2Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12L12 16L16 12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 8V16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> <span>Share on X</span>';
-      shareButton.style.backgroundColor = 'black';
-      shareButton.style.color = 'white';
-      shareButton.style.border = 'none';
-      shareButton.style.padding = '10px 16px';
-      shareButton.style.borderRadius = '8px';
-      shareButton.style.cursor = 'pointer';
-      shareButton.style.marginTop = '15px';
-      shareButton.style.display = 'inline-flex';
-      shareButton.style.alignItems = 'center';
-      shareButton.style.gap = '8px';
-      shareButton.onclick = () => {
-        // Prepare tweet content without hashtags
-        const tweetText = `I've spent ${stats.totalHours} hours and ${stats.totalMinutes} minutes in ${stats.totalMeetings} meetings so far this year! Track your own meeting stats with ClockedIn`;
-        const tweetUrl = "https://clockedin.app"; // Replace with your actual URL
-        
-        window.open(
-          `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(tweetUrl)}`,
-          "_blank"
-        );
-      };
-      
-      // Assemble modal
-      contentContainer.appendChild(closeButton);
-      contentContainer.appendChild(heading);
-      contentContainer.appendChild(imgElement);
-      contentContainer.appendChild(instructions);
-      contentContainer.appendChild(shareButton);
-      modal.appendChild(contentContainer);
-      
-      // Add modal to body
-      document.body.appendChild(modal);
+      // Open Twitter Web Intent with the image URL
+      window.open(
+        `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(data.imageUrl)}`,
+        "_blank"
+      );
       
       setSharingImage(false);
     } catch (err) {
-      console.error('Error capturing image:', err);
+      console.error('Error sharing stats:', err);
       setSharingImage(false);
     }
   };
