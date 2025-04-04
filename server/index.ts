@@ -126,35 +126,67 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
     oauth2Client.setCredentials(tokens);
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
-    // Get events from the beginning of 2024
-    const startDate = new Date('2024-01-01T00:00:00Z');
+    // Get events from the beginning of 2025 only
+    const startDate = new Date('2025-01-01T00:00:00Z');
+    const endDate = new Date('2025-12-31T23:59:59Z');
     const now = new Date();
+    
+    // Use the earlier of now or end of 2025 as the end date
+    const timeMax = now < endDate ? now.toISOString() : endDate.toISOString();
 
     const response = await calendar.events.list({
       calendarId: 'primary',
       timeMin: startDate.toISOString(),
-      timeMax: now.toISOString(),
+      timeMax: timeMax,
       singleEvents: true,
       orderBy: 'startTime',
     });
 
     const events = response.data.items || [];
-    let totalMinutes = 0;
-    const totalMeetings = events.length;
-
+    
+    // Filter for actual meetings
+    const meetings = events.filter(event => {
+      // Check for video conferencing data
+      const hasConferenceLink = !!event.conferenceData || 
+        (event.description && 
+          (event.description?.includes('zoom.') || 
+           event.description?.includes('meet.google') || 
+           event.description?.includes('teams.microsoft')));
+      
+      // Check for attendees (more than just the organizer)
+      const hasMultipleAttendees = event.attendees && event.attendees.length > 1;
+      
+      // Check event title for meeting keywords
+      const isMeetingByName = event.summary && 
+        (/meeting|call|sync|standup|catch[ -]up|1:1|1on1|review|discussion/i).test(event.summary);
+      
+      // Exclude personal events
+      const isPersonal = event.summary && 
+        (/vacation|holiday|day off|leave|break|lunch|personal/i).test(event.summary);
+      
+      return (hasConferenceLink || hasMultipleAttendees || isMeetingByName) && !isPersonal;
+    });
+    
     // Debug logging for meetings
-    console.log(`Found ${totalMeetings} meetings in 2024 so far:`);
-    events.forEach((event, index) => {
+    console.log(`Found ${meetings.length} meetings in 2025 so far (filtered from ${events.length} total events):`);
+    meetings.forEach((event, index) => {
       if (event.summary) {
         const start = event.start?.dateTime ? new Date(event.start.dateTime) : null;
         const end = event.end?.dateTime ? new Date(event.end.dateTime) : null;
         const duration = start && end ? Math.round((end.getTime() - start.getTime()) / (1000 * 60)) : 0;
         
-        console.log(`[${index + 1}] ${event.summary} - ${start?.toLocaleString()} (${duration} minutes)`);
+        const meetingType = [];
+        if (event.conferenceData) meetingType.push("Video");
+        if (event.attendees && event.attendees.length > 1) meetingType.push(`${event.attendees.length} attendees`);
+        
+        console.log(`[${index + 1}] ${event.summary} - ${start?.toLocaleString()} (${duration} minutes) [${meetingType.join(', ')}]`);
       }
     });
 
-    events.forEach(event => {
+    let totalMinutes = 0;
+    const totalMeetings = meetings.length;
+
+    meetings.forEach(event => {
       if (event.start?.dateTime && event.end?.dateTime) {
         const start = new Date(event.start.dateTime);
         const end = new Date(event.end.dateTime);
@@ -170,7 +202,7 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
       totalMeetings,
       totalHours,
       totalMinutes: extraMinutes,
-      meetings: events.map(event => ({
+      meetings: meetings.map(event => ({
         summary: event.summary || 'Untitled Meeting',
         start: event.start,
         end: event.end,
