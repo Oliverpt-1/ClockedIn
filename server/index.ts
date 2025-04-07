@@ -10,9 +10,20 @@ import rateLimit from 'express-rate-limit';
 
 dotenv.config();
 
+// Debug environment variables
+console.log('Environment variables:');
+console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
+console.log('GOOGLE_REDIRECT_URI:', process.env.GOOGLE_REDIRECT_URI);
+
 const app = express();
 const port = process.env.PORT || 3001;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+let FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+// Make sure FRONTEND_URL has a protocol
+if (FRONTEND_URL && !FRONTEND_URL.startsWith('http')) {
+  FRONTEND_URL = 'https://' + FRONTEND_URL;
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 // Simple rate limiter to prevent abuse
@@ -125,6 +136,8 @@ app.get('/auth/google', (req, res) => {
 app.get('/auth/google/callback', async (req, res) => {
   const { code } = req.query;
   
+  console.log('Callback received, FRONTEND_URL:', FRONTEND_URL);
+  
   if (!code) {
     console.error('No authorization code received from Google');
     return res.redirect(`${FRONTEND_URL}?error=no_code`);
@@ -145,10 +158,12 @@ app.get('/auth/google/callback', async (req, res) => {
     
     // Create JWT token
     const token = jwt.sign({ userId, authenticated: true }, JWT_SECRET, { expiresIn: '24h' });
-    console.log('Created JWT token, redirecting to frontend...');
     
-    // Use FRONTEND_URL from environment
-    res.redirect(`${FRONTEND_URL}/auth/google/callback?token=${token}`);
+    // Log the exact URL we're redirecting to
+    const redirectURL = `${FRONTEND_URL}/auth/google/callback?token=${token}`;
+    console.log('Redirecting to:', redirectURL);
+    
+    res.redirect(redirectURL);
   } catch (error) {
     console.error('Error during Google authentication:', error);
     if (error instanceof Error) {
