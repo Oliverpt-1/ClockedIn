@@ -98,6 +98,11 @@ const Login: FC<LoginProps> = ({ setIsAuthenticated }) => {
       {/* Footer */}
       <div className="mt-12 text-center text-gray-500 text-sm z-10">
         ClockedIn • Plan your 2025 meetings better
+        <div className="mt-2">
+          <a href="/privacy-policy" className="text-blue-500 hover:text-blue-700 underline" target="_blank" rel="noopener noreferrer">
+            Privacy Policy
+          </a>
+        </div>
       </div>
       
       {/* Add animation keyframes */}

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import GoogleCallback from './pages/GoogleCallback';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -74,6 +75,10 @@ function App() {
           <Route 
             path="/auth/google/callback" 
             element={<GoogleCallback setIsAuthenticated={setIsAuthenticated} />} 
+          />
+          <Route 
+            path="/privacy-policy" 
+            element={<PrivacyPolicy />} 
           />
         </Routes>
       </div>
