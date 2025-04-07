@@ -196,13 +196,49 @@ app.get('/api/meetings', verifyToken, async (req, res) => {
 
     const events = response.data.items || [];
     
-    // VERY simple exclusion system - only exclude events with specific keywords
-    const exclusionKeywords = ['party', 'fest', 'hotel', 'flight', 'vacation', 'holiday', 'dinner'];
+    // Meeting detection configuration
+    const meetingKeywords = [
+      'meeting', 'call', 'sync', 'standup', 'interview', 'workshop', 'presentation',
+      'review', 'discussion', 'planning', 'check-in', 'checkin', '1:1', 'one-on-one',
+      'office hours', 'consultation', 'session'
+    ];
+    
+    const exclusionKeywords = [
+      'party', 'fest', 'hotel', 'flight', 'vacation', 'holiday', 'dinner',
+      'lunch break', 'coffee break', 'deadline', 'reminder', 'blocked',
+      'focus time', 'do not disturb', 'out of office', 'ooo'
+    ];
+
     const meetings = events.filter(event => {
       const eventTitle = (event.summary || '').toLowerCase();
+      const eventDescription = (event.description || '').toLowerCase();
       
-      // Check if the event title contains any exclusion keywords
-      return !exclusionKeywords.some(keyword => eventTitle.includes(keyword));
+      // Skip events with exclusion keywords
+      if (exclusionKeywords.some(keyword => eventTitle.includes(keyword))) {
+        return false;
+      }
+
+      // Check for video conferencing links
+      const hasVideoLink = event.conferenceData || 
+                          eventDescription.includes('zoom.us') ||
+                          eventDescription.includes('meet.google.com') ||
+                          eventDescription.includes('teams.microsoft.com');
+
+      // Check for meeting keywords in title
+      const hasMeetingKeyword = meetingKeywords.some(keyword => eventTitle.includes(keyword));
+
+      // Check for multiple attendees (excluding the organizer)
+      const hasMultipleAttendees = event.attendees && event.attendees.length > 1;
+
+      // Check for meeting-like description
+      const hasMeetingDescription = eventDescription.includes('agenda') ||
+                                   eventDescription.includes('meeting notes') ||
+                                   eventDescription.includes('action items');
+
+      // Event must meet at least one of these criteria to be considered a meeting
+      return hasVideoLink || 
+             (hasMeetingKeyword && hasMultipleAttendees) ||
+             (hasMeetingDescription && hasMultipleAttendees);
     });
     
     // Debug logging for meetings
@@ -347,13 +383,49 @@ app.get('/api/meeting-stats-image', verifyToken, async (req, res) => {
 
     const events = response.data.items || [];
     
-    // VERY simple exclusion system - only exclude events with specific keywords
-    const exclusionKeywords = ['party', 'fest', 'hotel', 'flight', 'vacation', 'holiday', 'dinner'];
+    // Meeting detection configuration
+    const meetingKeywords = [
+      'meeting', 'call', 'sync', 'standup', 'interview', 'workshop', 'presentation',
+      'review', 'discussion', 'planning', 'check-in', 'checkin', '1:1', 'one-on-one',
+      'office hours', 'consultation', 'session'
+    ];
+    
+    const exclusionKeywords = [
+      'party', 'fest', 'hotel', 'flight', 'vacation', 'holiday', 'dinner',
+      'lunch break', 'coffee break', 'deadline', 'reminder', 'blocked',
+      'focus time', 'do not disturb', 'out of office', 'ooo'
+    ];
+
     const meetings = events.filter(event => {
       const eventTitle = (event.summary || '').toLowerCase();
+      const eventDescription = (event.description || '').toLowerCase();
       
-      // Check if the event title contains any exclusion keywords
-      return !exclusionKeywords.some(keyword => eventTitle.includes(keyword));
+      // Skip events with exclusion keywords
+      if (exclusionKeywords.some(keyword => eventTitle.includes(keyword))) {
+        return false;
+      }
+
+      // Check for video conferencing links
+      const hasVideoLink = event.conferenceData || 
+                          eventDescription.includes('zoom.us') ||
+                          eventDescription.includes('meet.google.com') ||
+                          eventDescription.includes('teams.microsoft.com');
+
+      // Check for meeting keywords in title
+      const hasMeetingKeyword = meetingKeywords.some(keyword => eventTitle.includes(keyword));
+
+      // Check for multiple attendees (excluding the organizer)
+      const hasMultipleAttendees = event.attendees && event.attendees.length > 1;
+
+      // Check for meeting-like description
+      const hasMeetingDescription = eventDescription.includes('agenda') ||
+                                   eventDescription.includes('meeting notes') ||
+                                   eventDescription.includes('action items');
+
+      // Event must meet at least one of these criteria to be considered a meeting
+      return hasVideoLink || 
+             (hasMeetingKeyword && hasMultipleAttendees) ||
+             (hasMeetingDescription && hasMultipleAttendees);
     });
     
     // Debug logging for meetings
