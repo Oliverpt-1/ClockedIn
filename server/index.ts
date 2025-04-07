@@ -112,11 +112,13 @@ app.get('/api/auth/check', verifyToken, (req, res) => {
 
 // Google authentication routes
 app.get('/auth/google', (req, res) => {
+  console.log('Starting Google OAuth flow...');
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: ['https://www.googleapis.com/auth/calendar.readonly'],
     prompt: 'consent'
   });
+  console.log('Generated Google OAuth URL:', url);
   res.redirect(url);
 });
 
@@ -129,8 +131,11 @@ app.get('/auth/google/callback', async (req, res) => {
   }
 
   try {
+    console.log('Received authorization code, exchanging for tokens...');
     const { tokens } = await oauth2Client.getToken(code as string);
-    const userId = Math.random().toString(36).substring(7); // In production, use proper user IDs
+    console.log('Successfully received tokens from Google');
+    
+    const userId = Math.random().toString(36).substring(7);
     
     // Store tokens with expiry information for cleanup
     userTokens[userId] = {
@@ -140,17 +145,17 @@ app.get('/auth/google/callback', async (req, res) => {
     
     // Create JWT token
     const token = jwt.sign({ userId, authenticated: true }, JWT_SECRET, { expiresIn: '24h' });
+    console.log('Created JWT token, redirecting to frontend...');
     
-    // Redirect with token - hardcoded for reliability
-    res.redirect(`https://clocked-in.vercel.app/auth/google/callback?token=${token}`);
+    // Use FRONTEND_URL from environment
+    res.redirect(`${FRONTEND_URL}/auth/google/callback?token=${token}`);
   } catch (error) {
     console.error('Error during Google authentication:', error);
-    // Log specific error details
     if (error instanceof Error) {
       console.error('Error message:', error.message);
       console.error('Error stack:', error.stack);
     }
-    res.redirect(`https://clocked-in.vercel.app?error=auth_failed&reason=${encodeURIComponent('Failed to exchange authorization code')}`);
+    res.redirect(`${FRONTEND_URL}?error=auth_failed&reason=${encodeURIComponent('Failed to exchange authorization code')}`);
   }
 });
 
